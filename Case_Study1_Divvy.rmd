@@ -1,5 +1,9 @@
-# %% [code]
-# %% [code]
+## Executive Summary: Top 3 Recommendations
+# Based on the analysis of first quarter of Cyclistic data for the years 2019 and 2020, I recommend the following:
+# 1. **"Weekend Warrior" Membership:** Target casual riders who peak on Saturdays/Sundays.
+# 2. ** Leisure Conversion Campaign:** Focus marketing spend in leisure trips as usage surges for casual riders.
+# 3. **Leisure Station Partnerships:** Focus physical ads at coastline/park stations.
+
 # 1. Ask
 # The business goal is to identify how annual members and casual riders use Cyclistic bikes differently to design marketing strategies for converting casual riders into members.
 
