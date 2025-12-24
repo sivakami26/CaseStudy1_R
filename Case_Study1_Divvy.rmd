@@ -1,0 +1,102 @@
+# %% [code]
+# 1. Ask
+# The business goal is to identify how annual members and casual riders use Cyclistic bikes differently to design marketing strategies for converting casual riders into members.
+
+# 2. Prepare
+# We are using the **Divvy 2019 Q1** and **Divvy 2020 Q1** datasets.
+
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+
+
+
+#load-data
+
+q1_2019 <- read_csv("/kaggle/input/casestudy1-divvy-trips/Divvy_Trips_2019_Q1.csv")
+q1_2020 <- read_csv("/kaggle/input/casestudy1-divvy-trips/Divvy_Trips_2020_Q1.csv")
+
+# Rename 2019 columns to match 2020 format
+q1_2019 <- rename(q1_2019
+                   ,ride_id = trip_id
+                   ,rideable_type = bikeid
+                   ,started_at = start_time
+                   ,ended_at = end_time
+                   ,start_station_name = from_station_name
+                   ,start_station_id = from_station_id
+                   ,end_station_name = to_station_name
+                   ,end_station_id = to_station_id
+                   ,member_casual = usertype)
+
+# Convert types to ensure compatibility
+q1_2019 <-  mutate(q1_2019, ride_id = as.character(ride_id)
+                   ,rideable_type = as.character(rideable_type))
+
+# Merge datasets
+all_trips <- bind_rows(q1_2019, q1_2020)
+
+
+# Reassign labels: "Subscriber" -> "member" and "Customer" -> "casual"
+all_trips <-  all_trips %>%
+  mutate(member_casual = recode(member_casual
+                                ,"Subscriber" = "member"
+                                ,"Customer" = "casual"))
+
+# Add ride_length in seconds
+all_trips$ride_length <- difftime(all_trips$ended_at, all_trips$started_at)
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
+
+# Add day_of_week
+all_trips$day_of_week <- format(as.Date(all_trips$started_at), "%A")
+
+# Remove "bad" data (negative durations or test stations)
+all_trips_v2 <- all_trips[!(all_trips$start_station_name == "HQ QR" | all_trips$ride_length < 0),]
+
+# Compare average ride length
+all_trips_v2 %>% 
+  group_by(member_casual) %>% 
+  summarise(number_of_rides = n(), .groups = 'drop', average_duration = mean(ride_length))
+
+
+all_trips_v2 %>% 
+  group_by(member_casual, day_of_week) %>% 
+  summarise(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, day_of_week) %>% 
+  ggplot(aes(x = day_of_week, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(title = "Average Trip Duration: Members vs Casual", y = "Seconds")
+
+
+## 3. Recommendations
+# Based on the analysis, here are my top three recommendations:
+# **Targeted Weekend Campaigns:** Since casual riders peak on weekends, offer a "Weekend-Only" membership.
+
+all_trips_v2 %>% 
+  group_by(member_casual, day_of_week) %>% 
+  summarise(number_of_rides=n(), .groups = "drop") %>% 
+  ggplot(aes(x = day_of_week, y = number_of_rides, fill = member_casual)) +
+  labs(title = "Total Rides vs.Day of The Week") +
+  geom_col(width = 0.5, position = position_dodge(width = 0.5)) +
+  scale_y_continuous(labels = function(x) format(x,scientific = FALSE))
+
+
+# 2. **Seasonal Discounts:** Casual usage is highest in summer; launch a "Summer Member" promotion.
+# 3. **Leisure Route Marketing:** Increase advertising at stations near parks and waterfronts where casual riders frequent.
+# Prepare the data: Filter for casual riders and find their top 10 starting stations
+top_casual_stations <- all_trips_v2 %>%
+  filter(member_casual == "casual") %>%
+  group_by(start_station_name) %>%
+  summarise(n = n(), .groups = 'drop') %>%
+  arrange(desc(n)) %>%
+  slice_head(n = 10) # Get top 10 stations
+
+# Plot: A horizontal bar chart
+top_casual_stations %>% ggplot(aes(x = reorder(start_station_name, n), y = n)) +
+  geom_bar(stat = "identity", fill = "#69b3a2") + # Use a single color
+  coord_flip() + # Flip coordinates to make station names readable
+  labs(
+    title = "Top 10 Starting Stations for Casual Riders",
+    x = "Start Station Name",
+    y = "Number of Rides"
+  ) +
+  theme_minimal()
