@@ -1,4 +1,5 @@
 # %% [code]
+# %% [code]
 # 1. Ask
 # The business goal is to identify how annual members and casual riders use Cyclistic bikes differently to design marketing strategies for converting casual riders into members.
 
@@ -48,7 +49,8 @@ all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
 
 # Add day_of_week
 all_trips$day_of_week <- format(as.Date(all_trips$started_at), "%A")
-
+all_trips <- all_trips %>% 
+  mutate(hour = hour(started_at))
 # Remove "bad" data (negative durations or test stations)
 all_trips_v2 <- all_trips[!(all_trips$start_station_name == "HQ QR" | all_trips$ride_length < 0),]
 
@@ -100,3 +102,45 @@ top_casual_stations %>% ggplot(aes(x = reorder(start_station_name, n), y = n)) +
     y = "Number of Rides"
   ) +
   theme_minimal()
+
+# This chart highlights that casual riders peak on weekends, while members are more active during the work week.
+
+all_trips_v2 %>%
+  group_by(member_casual, day_of_week) %>%
+  summarise(number_of_rides = n(), .groups = "drop") %>%
+  ggplot(aes(x = day_of_week, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Total Rides by Day of Week", x = "Day of Week", y = "Number of Rides", fill = "User Type") +
+  theme_minimal()
+
+
+
+#This visualizes the story of utility (Members) vs. leisure (Casuals). You will see two humps for members (rush hours) and a gradual bell curve for casuals.
+
+all_trips_v2 %>%
+  group_by(member_casual, hour) %>%
+  summarise(number_of_rides = n(), .groups = "drop") %>%
+  ggplot(aes(x = hour, y = number_of_rides, color = member_casual)) +
+  geom_line(linewidth = 1.2) +
+  #scale_x_continuous(breaks = seq(0, 23, by = 2)) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Hourly Ride Patterns: Commuters vs. Leisure", x = "Hour of Day (24h)", y = "Number of Rides", color = "User Type") +
+  theme_minimal()
+# Since raw geospatial heatmaps require specific latitude/longitude packages, a Facet Bar Chart is the most effective "business heatmap" to show geographic differences in station popularity.
+# Find Top 10 stations for each group
+top_stations <- all_trips_v2 %>%
+  filter(!is.na(start_station_name) & start_station_name != "") %>%
+  group_by(member_casual, start_station_name) %>%
+  summarise(number_of_rides = n(), .groups = "drop") %>%
+  group_by(member_casual) %>%
+  slice_max(order_by = number_of_rides, n = 10)
+
+# Plotting the comparison
+ggplot(top_stations, aes(x = reorder(start_station_name, number_of_rides), y = number_of_rides, fill = member_casual)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap(~member_casual, scales = "free_y") +
+  labs(title = "Top 10 Start Stations: Geographic Preferences", x = "Station Name", y = "Total Rides") +
+  theme_minimal() +
+  theme(legend.position = "none") # Legend is redundant due to facets                    
